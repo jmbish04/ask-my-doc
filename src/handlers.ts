@@ -12,7 +12,7 @@ const openApiSchema = {
   },
   "servers": [
     {
-      "url": "https://ask-my-doc.hacolby.workers.dev",
+      "url": "https://ask-my-doc.SUBDOMAIN.workers.dev",
       "description": "Cloudflare Worker deployment"
     }
   ],
