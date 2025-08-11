@@ -1,0 +1,175 @@
+//src/openapi.ts
+
+export const openApiSchema = {
+  openapi: '3.1.0',
+  info: {
+    title: 'Gemini CLI Document Worker API',
+    description:
+      'An API for uploading, storing, and interacting with documents via Cloudflare services. Optimized for use with a custom GPT action.',
+    version: '1.0.0',
+  },
+  servers: [
+    {
+      url: 'https://ask-my-doc.SUBDOMAIN.workers.dev',
+      description: 'Cloudflare Worker deployment',
+    },
+  ],
+  paths: {
+    '/': {
+      post: {
+        operationId: 'uploadDocument',
+        summary: 'Upload a new document',
+        description:
+          'Uploads a document for processing, storing it in R2, D1, and Vectorize. Returns a unique URL for the document.',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                properties: {
+                  file: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'The document file to upload.',
+                  },
+                },
+                required: ['file'],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Document uploaded successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string' },
+                    url: { type: 'string', format: 'uri' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'File not provided' },
+          500: { description: 'Failed to upload and process file' },
+        },
+      },
+    },
+    '/{fileId}/ask': {
+      post: {
+        operationId: 'askDocument',
+        summary: 'Ask a question about a specific document',
+        description:
+          "Takes a natural language query and uses a generative AI model to answer it based on the document's content.",
+        parameters: [
+          {
+            name: 'fileId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'The unique ID of the document.',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description: "The question to ask about the document.",
+                  },
+                },
+                required: ['query'],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Successfully retrieved answer',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    response: {
+                      type: 'string',
+                      description: "The AI's answer based on the document.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Query not provided' },
+          404: { description: 'Document not found' },
+          500: { description: 'Failed to process query' },
+        },
+      },
+    },
+    '/{fileId}/semantic': {
+      post: {
+        operationId: 'semanticSearch',
+        summary: 'Perform a semantic search on a specific document',
+        description:
+          'Finds document chunks most semantically similar to the provided query using a vector database.',
+        parameters: [
+          {
+            name: 'fileId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'The unique ID of the document.',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  query: {
+                    type: 'string',
+                    description: 'The semantic search query.',
+                  },
+                },
+                required: ['query'],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Successfully retrieved search results',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    chunks: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: { text: { type: 'string' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Query not provided' },
+          500: { description: 'Failed to perform semantic search' },
+        },
+      },
+    },
+  },
+}
