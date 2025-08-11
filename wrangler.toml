@@ -1,0 +1,24 @@
+name = "ask-my-doc"
+main = "src/index.ts"
+compatibility_date = "2024-07-25"
+
+# R2 Binding
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "ask-my-doc"
+
+# D1 Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "ask-my-doc"
+database_id = "8260783c-903f-4c51-95dd-865f9ad2bbab"
+migrations_dir = "migrations"
+
+# Vectorize Binding
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "ask-my-doc"
+
+# AI Binding
+[ai]
+binding = "AI"

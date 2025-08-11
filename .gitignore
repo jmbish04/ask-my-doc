@@ -1,0 +1,9 @@
+# Dependencies
+/node_modules
+
+# Wrangler
+.wrangler/
+wrangler.toml.local
+
+# System files
+.DS_Store

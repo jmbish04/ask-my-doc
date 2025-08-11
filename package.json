@@ -1,0 +1,19 @@
+{
+  "name": "ask-my-doc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+    "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate:local": "wrangler d1 migrations apply ask-my-doc --local",
+    "migrate:remote": "wrangler d1 migrations apply ask-my-doc --remote",
+    "deploy": "pnpm run migrate:remote && npx wrangler deploy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.6.3",
+  "dependencies": {
+    "hono": "^4.9.0"
+  }
+}
