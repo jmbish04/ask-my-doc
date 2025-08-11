@@ -7,14 +7,7 @@ compatibility_date = "2024-07-25"
 binding = "R2"
 bucket_name = "ask-my-doc"
 
-# This binding tells Wrangler to serve the contents of the `./public` directory
-# from a special R2 bucket. It's a modern and automated alternative to manually
-# creating and binding a bucket for static files.
-[site]
-bucket = "./public"
-# This binding is the new standard. It automatically creates an ASSETS binding.
-# The previous STATIC_ASSETS binding is no longer needed.
-# binding = "ASSETS" # This is automatically created by the `[site]` binding.
+
 
 # D1 Binding
 [[d1_databases]]
