@@ -7,6 +7,16 @@ const flowbiteHeader = `
 
 const flowbiteBodyScript = `<script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>`;
 
+const navBar = `
+  <nav class="bg-white border-gray-200 dark:bg-gray-900 shadow-md">
+    <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
+      <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse">
+        <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Ask My Doc</span>
+      </a>
+    </div>
+  </nav>
+`;
+
 export const landingPage = (documents: { id: string; name: string }[]) => `
 <!DOCTYPE html>
 <html>
@@ -15,9 +25,9 @@ export const landingPage = (documents: { id: string; name: string }[]) => `
   <title>Ask My Doc</title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
-  <div class="container mx-auto p-4">
-    <h1 class="text-4xl font-bold text-center text-gray-900 dark:text-white mb-8">Ask My Doc</h1>
+  ${navBar}
 
+  <div class="container mx-auto p-4">
     <div class="max-w-2xl mx-auto mb-8">
       <div class="p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700">
         <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Upload a new document</h2>
@@ -72,6 +82,7 @@ export const askFrontend = `
   <title>Ask My Doc</title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
+  ${navBar}
   <div class="container mx-auto p-4">
     <h1 class="text-4xl font-bold text-center text-gray-900 dark:text-white mb-8">Ask a question</h1>
     <div class="max-w-2xl mx-auto">
@@ -113,6 +124,7 @@ export const semanticFrontend = `
   <title>Semantic Search</title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
+  ${navBar}
   <div class="container mx-auto p-4">
     <h1 class="text-4xl font-bold text-center text-gray-900 dark:text-white mb-8">Semantic Search</h1>
     <div class="max-w-2xl mx-auto">
