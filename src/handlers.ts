@@ -208,6 +208,12 @@ const openApiSchema = {
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Fix 1: Place static routes before dynamic routes to prevent masking.
+// This route now serves the inlined OpenAPI schema directly.
+app.get('/openapi.json', (c) => {
+  return c.json(openApiSchema);
+});
+
 // GET / - Landing page with document list and upload form
 app.get('/', async (c) => {
   try {
@@ -238,11 +244,15 @@ app.post('/', async (c) => {
     // Store the raw file in R2
     await c.env.R2.put(r2Key, await file.arrayBuffer());
 
-    // Extract text from the file
-    const markdown = await c.env.AI.toMarkdown(await file.arrayBuffer(), {
-        prompt: 'Please extract all text content from this document, preserving the original structure as much as possible. Include text from headers, footers, tables, and all body content. Do not summarize or analyze the content, only extract it.'
-    });
-
+    // Fix 2: Correct the toMarkdown API call to match the documented shape.
+    const mdResponse = await c.env.AI.toMarkdown([
+      {
+        name: file.name,
+        blob: new Blob([await file.arrayBuffer()], { type: 'application/octet-stream' }),
+      },
+    ]);
+    const markdown = mdResponse[0]?.data ?? '';
+    
     // Generate embeddings
     const { data } = await c.env.AI.run('@cf/baai/bge-base-en-v1.5', {
       text: [markdown],
@@ -257,6 +267,8 @@ app.post('/', async (c) => {
       .run();
 
     // Store embeddings in Vectorize
+    // Note: Vectorize filtering requires a metadata index.
+    // To enable this, run `npx wrangler vectorize create-metadata-index <your-index-name> --property-name=fileId --type=string`
     await c.env.VECTORIZE.insert([
       {
         id: fileId,
@@ -265,9 +277,13 @@ app.post('/', async (c) => {
       },
     ]);
 
+    // Fix 5: Return a proper origin in the URL
+    const url = new URL(c.req.url);
+    url.pathname = `/${fileId}`;
+
     return c.json({
       message: 'File uploaded and processed successfully.',
-      url: `${c.req.url}${fileId}`,
+      url: url.toString(),
     });
   } catch (error) {
     console.error('Upload failed:', error);
@@ -275,8 +291,9 @@ app.post('/', async (c) => {
   }
 });
 
-// GET /<fileId> - Return extracted text
-app.get('/:fileId', async (c) => {
+// Fix 1: Constrain the fileId parameter with a UUID regex to prevent masking
+// other routes like /openapi.json.
+app.get('/:fileId{[0-9a-fA-F-]{36}}', async (c) => {
   const { fileId } = c.req.param();
   try {
     const { results } = await c.env.DB.prepare(
@@ -296,8 +313,7 @@ app.get('/:fileId', async (c) => {
   }
 });
 
-// GET /<fileId>/embeddings - Return embeddings
-app.get('/:fileId/embeddings', async (c) => {
+app.get('/:fileId{[0-9a-fA-F-]{36}}/embeddings', async (c) => {
     const { fileId } = c.req.param();
     try {
         const vectors = await c.env.VECTORIZE.getByIds([fileId]);
@@ -311,13 +327,12 @@ app.get('/:fileId/embeddings', async (c) => {
     }
 });
 
-// GET /<fileId>/ask - Serve chat frontend
-app.get('/:fileId/ask', (c) => {
-  return c.html(askFrontend);
+// Fix 5: Call the askFrontend function.
+app.get('/:fileId{[0-9a-fA-F-]{36}}/ask', (c) => {
+  return c.html(askFrontend());
 });
 
-// POST /<fileId>/ask - Handle chat queries
-app.post('/:fileId/ask', async (c) => {
+app.post('/:fileId{[0-9a-fA-F-]{36}}/ask', async (c) => {
   const { fileId } = c.req.param();
   const { query } = await c.req.json();
 
@@ -355,13 +370,12 @@ app.post('/:fileId/ask', async (c) => {
   }
 });
 
-// GET /<fileId>/semantic - Serve semantic search frontend
-app.get('/:fileId/semantic', (c) => {
-  return c.html(semanticFrontend);
+// Fix 5: Call the semanticFrontend function.
+app.get('/:fileId{[0-9a-fA-F-]{36}}/semantic', (c) => {
+  return c.html(semanticFrontend());
 });
 
-// POST /<fileId>/semantic - Handle semantic search queries
-app.post('/:fileId/semantic', async (c) => {
+app.post('/:fileId{[0-9a-fA-F-]{36}}/semantic', async (c) => {
   const { fileId } = c.req.param();
   const { query } = await c.req.json();
 
@@ -396,11 +410,6 @@ app.post('/:fileId/semantic', async (c) => {
     console.error('Failed to perform semantic search:', error);
     return c.json({ error: 'Failed to perform semantic search' }, 500);
   }
-});
-
-// Add a new route to serve the OpenAPI schema directly from the code
-app.get('/openapi.json', (c) => {
-  return c.json(openApiSchema);
 });
 
 export default app;
