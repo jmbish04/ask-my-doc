@@ -14,9 +14,11 @@
   "license": "ISC",
   "packageManager": "pnpm@10.6.3",
   "dependencies": {
-    "hono": "^4.9.0"
+    "hono": "^4.9.0",
+    "toucan-js": "^4.1.1"
   },
   "devDependencies": {
-    "@cloudflare/puppeteer": "^1.0.4"
+    "@cloudflare/puppeteer": "^1.0.4",
+    "openapi-types": "^12.1.3"
   }
 }
