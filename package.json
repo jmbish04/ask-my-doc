@@ -5,8 +5,8 @@
   "main": "index.js",
     "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "migrate:local": "wrangler d1 migrations apply ask-my-doc --local",
-    "migrate:remote": "wrangler d1 migrations apply ask-my-doc --remote",
+    "migrate:local": "npx wrangler d1 migrations apply DB --local",
+    "migrate:remote": "npx wrangler d1 migrations apply DB --remote",
     "deploy": "pnpm run migrate:remote && npx wrangler deploy"
   },
   "keywords": [],
