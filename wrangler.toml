@@ -22,3 +22,6 @@ index_name = "ask-my-doc"
 # AI Binding
 [ai]
 binding = "AI"
+
+[browser]
+binding = "MYBROWSER"

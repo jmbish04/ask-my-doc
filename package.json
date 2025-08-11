@@ -3,7 +3,7 @@
   "version": "1.0.3",
   "description": "",
   "main": "index.js",
-    "scripts": {
+  "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate:local": "npx wrangler d1 migrations apply DB --local",
     "migrate:remote": "npx wrangler d1 migrations apply DB --remote",
@@ -15,5 +15,8 @@
   "packageManager": "pnpm@10.6.3",
   "dependencies": {
     "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "^1.0.4"
   }
 }

@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
-import { Env } from './types';
+import { Env, Input, Process, Output } from './types';
 import { askFrontend, semanticFrontend, landingPage } from './html';
+import puppeteer from '@cloudflare/puppeteer';
+import { Ai } from '@cloudflare/ai';
+import { Toucan } from 'toucan-js';
+import { extractTextFromPDF } from './pdf';
 
 // The OpenAPI schema is defined here as a constant.
 const openApiSchema = {
@@ -67,6 +71,41 @@ const openApiSchema = {
           },
           "500": {
             "description": "Failed to upload and process file"
+          }
+        }
+      }
+    },
+    "/process": {
+      "post": {
+        "operationId": "processDocument",
+        "summary": "Process a document from various sources",
+        "description": "Processes a document from R2, a local file, or a URL, and returns extracted text, embeddings, RAG format, and a summary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Failed to process document"
           }
         }
       }
@@ -203,6 +242,136 @@ const openApiSchema = {
         }
       }
     }
+  },
+  "components": {
+    "schemas": {
+      "ProcessRequest": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/Input"
+          },
+          "process": {
+            "$ref": "#/components/schemas/Process"
+          },
+          "output": {
+            "$ref": "#/components/schemas/Output"
+          }
+        }
+      },
+      "Input": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InputR2"
+          },
+          {
+            "$ref": "#/components/schemas/InputLocal"
+          },
+          {
+            "$ref": "#/components/schemas/InputURL"
+          }
+        ]
+      },
+      "InputR2": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["r2"]
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "bucket", "key"]
+      },
+      "InputLocal": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["local"]
+          },
+          "filename": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string",
+            "format": "byte"
+          }
+        },
+        "required": ["type", "filename", "content"]
+      },
+      "InputURL": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["url"]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "browser": {
+            "type": "boolean"
+          }
+        },
+        "required": ["type", "url"]
+      },
+      "Process": {
+        "type": "object",
+        "properties": {
+          "embeddings": {
+            "type": "boolean"
+          },
+          "rag_format": {
+            "type": "string",
+            "enum": ["none", "json", "markdown"]
+          },
+          "summary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Output": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "local": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProcessResponse": {
+        "type": "object",
+        "properties": {
+          "extracted_text": {
+            "type": "string"
+          },
+          "embedding": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rag": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    }
   }
 };
 
@@ -289,6 +458,90 @@ app.post('/', async (c) => {
     console.error('Upload failed:', error);
     return c.json({ error: 'Failed to upload and process file' }, 500);
   }
+});
+
+app.post('/process', async (c) => {
+  const { input, process, output }: { input: Input; process: Process; output: Output } = await c.req.json();
+	let text = '';
+
+	try {
+		if (input.type === 'r2') {
+			const obj = await c.env.R2.get(input.key);
+			if (!obj) return new Response('Object not found', { status: 404 });
+			const arrayBuffer = await obj.arrayBuffer();
+			if (obj.httpMetadata?.contentType === 'application/pdf') {
+				text = await extractTextFromPDF(arrayBuffer);
+			} else {
+				text = new TextDecoder().decode(arrayBuffer);
+			}
+		} else if (input.type === 'local') {
+			const bytes = Uint8Array.from(atob(input.content), (c) => c.charCodeAt(0));
+			if (input.filename.endsWith('.pdf')) {
+				text = await extractTextFromPDF(bytes.buffer);
+			} else {
+				text = new TextDecoder().decode(bytes);
+			}
+		} else if (input.type === 'url') {
+			if (input.browser) {
+				const browser = await puppeteer.launch(c.env.MYBROWSER);
+				const page = await browser.newPage();
+				await page.goto(input.url);
+				text = await page.evaluate(() => document.body.innerText);
+				await browser.close();
+			} else {
+				const resp = await fetch(input.url);
+				const contentType = resp.headers.get('content-type') || '';
+				if (contentType.includes('application/pdf')) {
+					const arrayBuffer = await resp.arrayBuffer();
+					text = await extractTextFromPDF(arrayBuffer);
+				} else {
+					const html = await resp.text();
+					text = html.replace(/<[^>]+>/g, ' ');
+				}
+			}
+		}
+
+		const result: any = { extracted_text: text };
+		const ai = new Ai(c.env.AI);
+
+		if (process?.embeddings) {
+			const { data } = await ai.run('@cf/baai/bge-base-en-v1.5', { text: [text] });
+			result.embedding = data[0];
+		}
+		if (process?.rag_format) {
+			if (process.rag_format === 'json') {
+				result.rag = JSON.stringify({ text });
+			} else if (process.rag_format === 'markdown') {
+				result.rag = `# Extracted Text\n\n${text}`;
+			}
+		}
+		if (process?.summary) {
+			const response = await ai.run('@cf/facebook/bart-large-cnn', {
+				input_text: text,
+				max_length: 1024,
+			});
+			result.summary = response.summary;
+		}
+
+		const prefix = output.key || 'output';
+		await c.env.R2.put(`${prefix}.txt`, text);
+		if (result.rag) {
+			const ext = process.rag_format === 'json' ? 'json' : 'md';
+			await c.env.R2.put(`${prefix}.rag.${ext}`, result.rag);
+		}
+		if (result.summary) {
+			await c.env.R2.put(`${prefix}.summary.txt`, result.summary);
+		}
+		if (result.embedding) {
+			await c.env.R2.put(`${prefix}.embedding.json`, JSON.stringify(result.embedding));
+		}
+
+		return c.json(result);
+	} catch (e: any) {
+		const sentry = c.get('sentry');
+		sentry.captureException(e);
+		return c.json({ error: e.message }, 500);
+	}
 });
 
 // Fix 1: Constrain the fileId parameter with a UUID regex to prevent masking
