@@ -7,11 +7,6 @@ import puppeteer from '@cloudflare/puppeteer'
 import { Toucan } from 'toucan-js'
 import { extractTextFromPDF } from './pdf'
 
-
-
-
-
-
 const app = new Hono<{ Bindings: Env }>()
 
 // ---- Optional Sentry (won’t crash if DSN missing) ----
@@ -26,7 +21,12 @@ app.use('*', async (c, next) => {
 })
 
 // ---- Static & health first (avoid /:fileId shadowing) ----
-app.get('/openapi.json', (c) => c.json(openApiSchema))
+app.get('/openapi.json', (c) => {
+  const origin = new URL(c.req.url).origin
+  // Inject current origin so the schema is always correct in dev/prod
+  const schema = { ...openApiSchema, servers: [{ url: origin, description: 'Cloudflare Worker deployment' }] }
+  return c.json(schema)
+})
 app.get('/health', (c) => c.json({ ok: true }))
 
 // ---- Landing page ----
