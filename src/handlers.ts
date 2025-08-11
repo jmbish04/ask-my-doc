@@ -197,7 +197,7 @@ app.post('/:fileId/semantic', async (c) => {
 // Add a new route to serve the OpenAPI schema from the `[site]` binding
 app.get('/openapi.json', async (c) => {
   // Use the ASSETS binding to fetch the file from the `public` directory
-  const openapiObject = await c.env.ASSETS.fetch(new Request(`${c.req.url}/openapi.json`, c.req));
+  const openapiObject = await c.env.ASSETS.fetch(new Request(new URL('/openapi.json', c.req.url), c.req));
   if (openapiObject.status !== 200) {
     return c.json({ error: 'OpenAPI schema not found' }, 404);
   }
