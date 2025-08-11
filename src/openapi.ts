@@ -1,6 +1,7 @@
-//src/openapi.ts
+// src/openapi.ts
+import type { OpenAPIV3_1 } from 'openapi-types'
 
-export const openApiSchema = {
+export const openApiSchema: OpenAPIV3_1.Document = {
   openapi: '3.1.0',
   info: {
     title: 'Gemini CLI Document Worker API',
@@ -8,12 +9,8 @@ export const openApiSchema = {
       'An API for uploading, storing, and interacting with documents via Cloudflare services. Optimized for use with a custom GPT action.',
     version: '1.0.0',
   },
-  servers: [
-    {
-      url: 'https://ask-my-doc.SUBDOMAIN.workers.dev',
-      description: 'Cloudflare Worker deployment',
-    },
-  ],
+  // Leave servers empty; we’ll inject the origin at runtime
+  servers: [],
   paths: {
     '/': {
       post: {
@@ -172,4 +169,4 @@ export const openApiSchema = {
       },
     },
   },
-}
+} as const
