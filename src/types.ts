@@ -1,6 +1,6 @@
 export interface Env {
   R2: R2Bucket;
-  STATIC_ASSETS: R2Bucket; // Add this line
+  ASSETS: { fetch: (request: Request) => Promise<Response> }; // Use ASSETS here
   DB: D1Database;
   VECTORIZE: VectorizeIndex;
   AI: Ai;
