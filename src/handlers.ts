@@ -2,14 +2,13 @@
 import { Hono } from 'hono'
 import { Env, Input, Process, Output } from './types'
 import { askFrontend, semanticFrontend, landingPage } from './html'
-import {openApiSchema } from './openapi'
+import { openApiSchema } from './openapi'
 import puppeteer from '@cloudflare/puppeteer'
 import { Toucan } from 'toucan-js'
-import { extractTextFromPDF } from './pdf'
 
 const app = new Hono<{ Bindings: Env }>()
 
-// ---- Optional Sentry (won’t crash if DSN missing) ----
+// Optional Sentry (no-op if SENTRY_DSN not set)
 app.use('*', async (c, next) => {
   try {
     if (c.env.SENTRY_DSN) {
@@ -20,16 +19,15 @@ app.use('*', async (c, next) => {
   await next()
 })
 
-// ---- Static & health first (avoid /:fileId shadowing) ----
+// Static & health first (avoid /:fileId shadowing)
 app.get('/openapi.json', (c) => {
   const origin = new URL(c.req.url).origin
-  // Inject current origin so the schema is always correct in dev/prod
   const schema = { ...openApiSchema, servers: [{ url: origin, description: 'Cloudflare Worker deployment' }] }
   return c.json(schema)
 })
 app.get('/health', (c) => c.json({ ok: true }))
 
-// ---- Landing page ----
+// Landing page
 app.get('/', async (c) => {
   try {
     const { results } = await c.env.DB.prepare(
@@ -43,7 +41,7 @@ app.get('/', async (c) => {
   }
 })
 
-// ---- Upload & process ----
+// Upload & process
 app.post('/', async (c) => {
   try {
     const formData = await c.req.formData()
@@ -64,18 +62,16 @@ app.post('/', async (c) => {
     const mdRes = await c.env.AI.toMarkdown([{ name: file.name, blob }])
     const markdown = mdRes[0]?.data ?? ''
 
-    // Embed document (BGE base = 768 dims; ensure your Vectorize index matches)
+    // Embed document (BGE base = 768 dims)
     const { data: emb } = await c.env.AI.run('@cf/baai/bge-base-en-v1.5', { text: [markdown] })
     const embedding = emb[0]
 
     // Persist to D1
     await c.env.DB.prepare(
       'INSERT INTO documents (id, name, r2_key, extracted_text, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)'
-    )
-      .bind(fileId, file.name, r2Key, markdown)
-      .run()
+    ).bind(fileId, file.name, r2Key, markdown).run()
 
-    // Persist to Vectorize (metadata filter requires indexed property `fileId`)
+    // Persist to Vectorize (requires metadata index on fileId)
     await c.env.VECTORIZE.insert([{ id: fileId, values: embedding, metadata: { fileId } }])
 
     // Return canonical URL
@@ -89,7 +85,7 @@ app.post('/', async (c) => {
   }
 })
 
-// ---- Process (R2 | local | url with optional Browser Rendering) ----
+// Process (R2 | local | url with optional Browser Rendering)
 app.post('/process', async (c) => {
   const { input, process, output }: { input: Input; process?: Process; output?: Output } =
     await c.req.json()
@@ -101,12 +97,20 @@ app.post('/process', async (c) => {
       if (!obj) return c.json({ error: 'Object not found' }, 404)
       const buf = await obj.arrayBuffer()
       const ct = obj.httpMetadata?.contentType || ''
-      text = ct.includes('application/pdf') ? await extractTextFromPDF(buf) : new TextDecoder().decode(buf)
+      if (ct.includes('application/pdf')) {
+        const mdRes = await c.env.AI.toMarkdown([{ name: input.key, blob: new Blob([buf], { type: 'application/pdf' }) }])
+        text = mdRes[0]?.data ?? ''
+      } else {
+        text = new TextDecoder().decode(buf)
+      }
     } else if (input.type === 'local') {
       const bytes = Uint8Array.from(atob(input.content), (ch) => ch.charCodeAt(0))
-      text = input.filename.toLowerCase().endsWith('.pdf')
-        ? await extractTextFromPDF(bytes.buffer)
-        : new TextDecoder().decode(bytes)
+      if (input.filename.toLowerCase().endsWith('.pdf')) {
+        const mdRes = await c.env.AI.toMarkdown([{ name: input.filename, blob: new Blob([bytes], { type: 'application/pdf' }) }])
+        text = mdRes[0]?.data ?? ''
+      } else {
+        text = new TextDecoder().decode(bytes)
+      }
     } else if (input.type === 'url') {
       if (input.browser) {
         // Browser Rendering via Puppeteer
@@ -115,20 +119,23 @@ app.post('/process', async (c) => {
         await page.goto(input.url, { waitUntil: 'networkidle0' })
         const html = await page.content()
         await browser.close()
-        text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-                   .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-                   .replace(/<[^>]+>/g, ' ')
+        text = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
       } else {
         const resp = await fetch(input.url)
         const ct = resp.headers.get('content-type') || ''
         if (ct.includes('application/pdf')) {
           const buf = await resp.arrayBuffer()
-          text = await extractTextFromPDF(buf)
+          const mdRes = await c.env.AI.toMarkdown([{ name: input.url, blob: new Blob([buf], { type: 'application/pdf' }) }])
+          text = mdRes[0]?.data ?? ''
         } else {
           const html = await resp.text()
-          text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-                     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-                     .replace(/<[^>]+>/g, ' ')
+          text = html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
         }
       }
     } else {
@@ -177,7 +184,7 @@ app.post('/process', async (c) => {
   }
 })
 
-// ---- UUID-constrained routes (prevents /openapi.json shadowing) ----
+// UUID-constrained routes (prevents /openapi.json shadowing)
 const UUID = '{[0-9a-fA-F-]{36}}'
 
 app.get(`/:fileId${UUID}`, async (c) => {
