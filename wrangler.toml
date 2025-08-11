@@ -7,6 +7,11 @@ compatibility_date = "2024-07-25"
 binding = "R2"
 bucket_name = "ask-my-doc"
 
+# R2 Binding for static assets like openapi.json
+[[r2_buckets]]
+binding = "STATIC_ASSETS"
+bucket_name = "ask-my-doc-static"
+
 # D1 Binding
 [[d1_databases]]
 binding = "DB"
