@@ -1,6 +1,7 @@
 name = "ask-my-doc"
 main = "src/index.ts"
 compatibility_date = "2025-08-10"
+compatibility_flags = ["nodejs_compat"]
 
 # R2 Binding
 [[r2_buckets]]
