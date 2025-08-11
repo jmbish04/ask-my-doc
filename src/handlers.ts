@@ -1,4 +1,3 @@
-// src/handlers.ts
 import { Hono } from 'hono';
 import { Env } from './types';
 import { askFrontend, semanticFrontend, landingPage } from './html';
@@ -195,18 +194,14 @@ app.post('/:fileId/semantic', async (c) => {
   }
 });
 
-// Add a new route to serve the OpenAPI schema from R2
+// Add a new route to serve the OpenAPI schema from the `[site]` binding
 app.get('/openapi.json', async (c) => {
-  const openapiObject = await c.env.STATIC_ASSETS.get('openapi.json');
-  if (!openapiObject) {
+  // Use the ASSETS binding to fetch the file from the `public` directory
+  const openapiObject = await c.env.ASSETS.fetch(new Request(`${c.req.url}/openapi.json`, c.req));
+  if (openapiObject.status !== 200) {
     return c.json({ error: 'OpenAPI schema not found' }, 404);
   }
-  const openapiJson = await openapiObject.text();
-  return new Response(openapiJson, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return openapiObject;
 });
 
 export default app;
