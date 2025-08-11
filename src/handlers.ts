@@ -194,4 +194,18 @@ app.post('/:fileId/semantic', async (c) => {
   }
 });
 
+// Add a new route to serve the OpenAPI schema from R2
+app.get('/openapi.json', async (c) => {
+  const openapiObject = await c.env.STATIC_ASSETS.get('openapi.json');
+  if (!openapiObject) {
+    return c.json({ error: 'OpenAPI schema not found' }, 404);
+  }
+  const openapiJson = await openapiObject.text();
+  return new Response(openapiJson, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+});
+
 export default app;
