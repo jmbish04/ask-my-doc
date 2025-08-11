@@ -76,3 +76,55 @@ export const semanticFrontend = `
 </body>
 </html>
 `;
+
+export const landingPage = (documents: { id: string; name: string }[]) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ask My Doc</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; text-align: left; }
+    .upload-form { margin-bottom: 2em; }
+  </style>
+</head>
+<body>
+  <h1>Ask My Doc</h1>
+  <div class="upload-form">
+    <h2>Upload a new document</h2>
+    <form action="/" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" required>
+      <button type="submit">Upload</button>
+    </form>
+  </div>
+  <h2>Uploaded Documents</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Document Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${documents
+        .map(
+          (doc) => `
+        <tr>
+          <td>${doc.name}</td>
+          <td>
+            <a href="/${doc.id}/ask" target="_blank">Ask</a> |
+            <a href="/${doc.id}/semantic" target="_blank">Semantic Search</a> |
+            <a href="/${doc.id}" target="_blank">View Text</a> |
+            <a href="/${doc.id}/embeddings" target="_blank">View Embeddings</a>
+          </td>
+        </tr>
+      `
+        )
+        .join('')}
+    </tbody>
+  </table>
+</body>
+</html>
+`;

@@ -1,8 +1,22 @@
 import { Hono } from 'hono';
 import { Env } from './types';
-import { askFrontend, semanticFrontend } from './html';
+import { askFrontend, semanticFrontend, landingPage } from './html';
 
 const app = new Hono<{ Bindings: Env }>();
+
+// GET / - Landing page with document list and upload form
+app.get('/', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT id, name FROM documents ORDER BY created_at DESC'
+    ).all();
+    const documents = results as { id: string; name: string }[];
+    return c.html(landingPage(documents));
+  } catch (error) {
+    console.error('Failed to fetch documents:', error);
+    return c.html(landingPage([]));
+  }
+});
 
 // POST / - Handle file uploads
 app.post('/', async (c) => {
@@ -33,7 +47,7 @@ app.post('/', async (c) => {
 
     // Store metadata in D1
     await c.env.DB.prepare(
-      'INSERT INTO documents (id, name, r2_key, extracted_text) VALUES (?, ?, ?, ?)'
+      'INSERT INTO documents (id, name, r2_key, extracted_text, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)'
     )
       .bind(fileId, file.name, r2Key, markdown)
       .run();
